@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "CODENAME Tracker",
+  "version": "1.0",
+  "description": "Track CODENAME checkboxes using session storage",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}
+
