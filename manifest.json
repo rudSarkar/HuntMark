@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "CODENAME Tracker",
+  "name": "HuntMark",
   "version": "1.0",
-  "description": "Track CODENAME checkboxes using session storage",
+  "description": "HuntMark is a simple browser extension that is help to mark target progress in Synack",
   "permissions": ["storage", "activeTab", "scripting"],
   "content_scripts": [
     {
