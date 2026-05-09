@@ -233,6 +233,45 @@ function injectStyles() {
             letter-spacing: 0.8px !important;
         }
 
+        /* ---- Synack vuln stats ---- */
+        #hm-vuln-stats {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+            padding: 10px 18px 12px !important;
+            border-bottom: 1px solid #1e1e1e !important;
+            flex-shrink: 0 !important;
+        }
+        #hm-vuln-section-label {
+            grid-column: 1 / -1 !important;
+            font-size: 8px !important;
+            font-weight: 700 !important;
+            color: #3a3a3a !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1.2px !important;
+            margin-bottom: 2px !important;
+        }
+        .hm-vuln-card {
+            background: #181818 !important;
+            border: 1px solid #222 !important;
+            border-radius: 8px !important;
+            padding: 9px 12px !important;
+        }
+        .hm-vuln-num {
+            font-size: 22px !important;
+            font-weight: 800 !important;
+            line-height: 1 !important;
+            font-variant-numeric: tabular-nums !important;
+        }
+        .hm-vuln-label {
+            font-size: 8px !important;
+            color: #555 !important;
+            margin-top: 4px !important;
+            font-weight: 600 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.7px !important;
+        }
+
         /* ---- Filter bar ---- */
         #hm-filters {
             display: flex !important;
@@ -432,6 +471,40 @@ function createSidePanel() {
 
     panel.appendChild(statsGrid);
 
+    // -- Synack vuln stats --
+    const vulnStats = document.createElement("div");
+    vulnStats.id = "hm-vuln-stats";
+
+    const vulnLabel = document.createElement("div");
+    vulnLabel.id = "hm-vuln-section-label";
+    vulnLabel.textContent = "Synack · Vulns";
+    vulnStats.appendChild(vulnLabel);
+
+    [
+        { id: "hm-vuln-under-review", color: "#ff8f00", label: "Under Review" },
+        { id: "hm-vuln-pending",      color: "#7c3aed", label: "Pending"      }
+    ].forEach(({ id, color, label }) => {
+        const card = document.createElement("div");
+        card.className = "hm-vuln-card";
+        card.style.borderLeft = `3px solid ${color}`;
+
+        const num = document.createElement("div");
+        num.className = "hm-vuln-num";
+        num.style.color = color;
+        num.id = id;
+        num.textContent = "—";
+
+        const lbl = document.createElement("div");
+        lbl.className = "hm-vuln-label";
+        lbl.textContent = label;
+
+        card.appendChild(num);
+        card.appendChild(lbl);
+        vulnStats.appendChild(card);
+    });
+
+    panel.appendChild(vulnStats);
+
     // -- Filter bar --
     const filterBar = document.createElement("div");
     filterBar.id = "hm-filters";
@@ -471,6 +544,7 @@ function createSidePanel() {
 
     document.body.appendChild(panel);
     updateTabPoints();
+    updateVulnStats();
 }
 
 // ================= TOGGLE =================
@@ -483,7 +557,7 @@ function togglePanel() {
     panel.classList.toggle("hm-open", opening);
     tab.classList.toggle("hm-open", opening);
 
-    if (opening) { refreshPanel(); updateTabPoints(); }
+    if (opening) { refreshPanel(); updateTabPoints(); updateVulnStats(); }
 }
 
 // ================= REFRESH =================
@@ -739,6 +813,47 @@ function addSelectFields() {
     const headerSpans = document.querySelectorAll("h4.target-tooltip-codename-header span");
     const pageTitleSpans = document.querySelectorAll('span[data-auto-type="label"][data-auto-name="Page Title"]');
     [...headerSpans, ...pageTitleSpans].forEach(createSelect);
+}
+
+// ================= VULN STATS =================
+let _vulnCache = {};
+let _vulnFetchedAt = 0;
+
+async function fetchVulnCount(status) {
+    try {
+        const token = sessionStorage.getItem('shared-session-com.synack.accessToken');
+        if (!token) return null;
+        const res = await fetch(
+            `https://platform.synack.com/api/vulnerabilities?page=1&per_page=100&filters%5Bstatus%5D=${status}`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (!Array.isArray(data)) return null;
+        return data.length === 100 ? '99+' : data.length;
+    } catch { return null; }
+}
+
+async function updateVulnStats() {
+    const now = Date.now();
+    if (Object.keys(_vulnCache).length && now - _vulnFetchedAt < 5 * 60 * 1000) {
+        applyVulnCounts(_vulnCache);
+        return;
+    }
+    const [underReview, pending] = await Promise.all([
+        fetchVulnCount('under_review'),
+        fetchVulnCount('pending_review')
+    ]);
+    _vulnCache = { underReview, pending };
+    _vulnFetchedAt = now;
+    applyVulnCounts(_vulnCache);
+}
+
+function applyVulnCounts({ underReview, pending }) {
+    const urEl = document.getElementById('hm-vuln-under-review');
+    const pdEl = document.getElementById('hm-vuln-pending');
+    if (urEl) urEl.textContent = underReview ?? '—';
+    if (pdEl) pdEl.textContent = pending ?? '—';
 }
 
 // ================= RESEARCHER STATS =================
