@@ -114,9 +114,10 @@ function injectStyles() {
             padding: 16px 8px !important;
             border-radius: 8px 0 0 8px !important;
             cursor: pointer !important;
-            font-size: 10px !important;
+            font-size: 11px !important;
             font-weight: 800 !important;
             letter-spacing: 2.5px !important;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.55) !important;
             z-index: 2147483647 !important;
             transition: right 0.28s cubic-bezier(0.4,0,0.2,1) !important;
             box-shadow: -3px 0 16px rgba(0,0,0,0.6) !important;
@@ -128,6 +129,54 @@ function injectStyles() {
         }
         #hm-tab:hover {
             filter: brightness(1.15) !important;
+        }
+        #hm-tab-tier-wrap {
+            display: inline-flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            writing-mode: horizontal-tb !important;
+            margin-top: 10px !important;
+            margin-bottom: 4px !important;
+            gap: 3px !important;
+        }
+        .hm-tier-seg {
+            width: 18px !important;
+            height: 13px !important;
+            border-radius: 3px !important;
+            background: rgba(0,0,0,0.3) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 9px !important;
+            font-weight: 900 !important;
+            color: rgba(255,255,255,0.35) !important;
+            transition: all 0.25s !important;
+            writing-mode: horizontal-tb !important;
+        }
+        .hm-tier-seg.hm-tier-filled {
+            background: rgba(255,255,255,0.18) !important;
+            color: rgba(255,255,255,0.7) !important;
+        }
+        .hm-tier-seg.hm-tier-current {
+            background: #fff !important;
+            color: #1565c0 !important;
+            font-size: 10px !important;
+            box-shadow: 0 0 8px rgba(255,255,255,0.5) !important;
+        }
+        #hm-tab-pts {
+            margin-top: 8px !important;
+            font-size: 14px !important;
+            font-weight: 900 !important;
+            letter-spacing: 1px !important;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.5) !important;
+        }
+        #hm-tab-pts-label {
+            margin-top: 3px !important;
+            font-size: 9px !important;
+            font-weight: 700 !important;
+            letter-spacing: 1px !important;
+            opacity: 0.85 !important;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5) !important;
         }
 
         /* ---- Header ---- */
@@ -332,7 +381,7 @@ function createSidePanel() {
     // Vertical tab (toggle handle)
     const tab = document.createElement("div");
     tab.id = "hm-tab";
-    tab.textContent = "HUNTMARK";
+    tab.innerHTML = `<span>HUNTMARK</span><span id="hm-tab-tier-wrap"><span class="hm-tier-seg" id="hm-tier-seg-5">5</span><span class="hm-tier-seg" id="hm-tier-seg-4">4</span><span class="hm-tier-seg" id="hm-tier-seg-3">3</span><span class="hm-tier-seg" id="hm-tier-seg-2">2</span><span class="hm-tier-seg" id="hm-tier-seg-1">1</span></span><span id="hm-tab-pts"></span><span id="hm-tab-pts-label"></span>`;
     tab.addEventListener("click", togglePanel);
     document.body.appendChild(tab);
 
@@ -421,6 +470,7 @@ function createSidePanel() {
     panel.appendChild(list);
 
     document.body.appendChild(panel);
+    updateTabPoints();
 }
 
 // ================= TOGGLE =================
@@ -433,7 +483,7 @@ function togglePanel() {
     panel.classList.toggle("hm-open", opening);
     tab.classList.toggle("hm-open", opening);
 
-    if (opening) refreshPanel();
+    if (opening) { refreshPanel(); updateTabPoints(); }
 }
 
 // ================= REFRESH =================
@@ -689,6 +739,49 @@ function addSelectFields() {
     const headerSpans = document.querySelectorAll("h4.target-tooltip-codename-header span");
     const pageTitleSpans = document.querySelectorAll('span[data-auto-type="label"][data-auto-name="Page Title"]');
     [...headerSpans, ...pageTitleSpans].forEach(createSelect);
+}
+
+// ================= RESEARCHER STATS =================
+let _statsCache = null;
+let _statsFetchedAt = 0;
+
+async function fetchResearcherStats() {
+    const now = Date.now();
+    if (_statsCache && now - _statsFetchedAt < 5 * 60 * 1000) return _statsCache;
+    try {
+        const token = sessionStorage.getItem('shared-session-com.synack.accessToken');
+        if (!token) return null;
+        const res = await fetch('https://platform.synack.com/api/researcher_statistics', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return null;
+        _statsCache = await res.json();
+        _statsFetchedAt = now;
+        return _statsCache;
+    } catch { return null; }
+}
+
+async function updateTabPoints() {
+    const data = await fetchResearcherStats();
+    const ptsEl = document.getElementById('hm-tab-pts');
+    const lblEl = document.getElementById('hm-tab-pts-label');
+    if (!ptsEl || !lblEl) return;
+    if (!data) { ptsEl.textContent = ''; lblEl.textContent = ''; return; }
+    const tier = data.find(s => s.id === 'tier');
+    if (!tier) return;
+
+    ptsEl.textContent = tier.pts_to_next_tier != null ? tier.pts_to_next_tier.toLocaleString() : '';
+    lblEl.textContent = 'TO NEXT';
+
+    const currentTier = tier.tier;
+    for (let t = 1; t <= 5; t++) {
+        const seg = document.getElementById(`hm-tier-seg-${t}`);
+        if (!seg) continue;
+        seg.className = 'hm-tier-seg' + (
+            t === currentTier ? ' hm-tier-current' :
+            t < currentTier  ? ' hm-tier-filled'  : ''
+        );
+    }
 }
 
 // ================= INIT =================
